@@ -2,6 +2,8 @@
 
 uniform mat4 view;
 uniform vec3 cam_pos;
+uniform bool enable_smoothing;
+uniform float smoothing;
 in vec2 pos;
 
 out vec4 o_color;
@@ -17,7 +19,7 @@ const float MAX_DIST = 512;
 struct ObjectDesc {
     uint type;
     vec3 pos;
-    uint material;
+    vec3 material;
     // this should actually be a union
     float radius; // spheres
     vec3 size; // box
@@ -27,7 +29,7 @@ struct ObjectDesc {
 
 struct Object {
     float distance;
-    uint id;
+    vec3 material;
 };
 
 uniform ObjectDesc objects[32];
@@ -83,8 +85,8 @@ Object obj_union(Object a, Object b) {
 Object obj_sunion(Object a, Object b, float k) {
     Object u = {
         smin(a.distance, b.distance, k),
-        // mix(a.color, b.color, a.distance - b.distance),
-        (a.distance < b.distance) ? a.id : b.id
+        // (a.distance < b.distance) ? a.material : b.material
+        mix(a.material, b.material, clamp(a.distance - b.distance, 0.0, 1.0))
     };
     return u;
 }
@@ -95,19 +97,19 @@ Object from_desc(vec3 pos, ObjectDesc desc) {
     switch(desc.type) {
     case SPHERE:
         obj.distance = sdf_sphere(pos, desc.pos, desc.radius),
-        obj.id = desc.material;
+        obj.material = desc.material;
         break;
     case BOX:
         obj.distance = sdf_box(pos, desc.pos, desc.size),
-        obj.id = desc.material;
+        obj.material = desc.material;
         break;
     case TORUS:
         obj.distance = sdf_torus(pos, desc.pos, desc.torus),
-        obj.id = desc.material;
+        obj.material = desc.material;
         break;
     case PLANE:
         obj.distance = sdf_plane(pos, desc.normal),
-        obj.id = desc.material;
+        obj.material = desc.material;
         break;
     }
 
@@ -117,7 +119,11 @@ Object from_desc(vec3 pos, ObjectDesc desc) {
 Object sample_sdf(vec3 pos) {
     Object result = from_desc(pos, objects[0]);
     for(uint i = 1; i < nb_objects; i++) {
-        result = obj_union(result, from_desc(pos, objects[i]));
+        if(enable_smoothing) {
+            result = obj_sunion(result, from_desc(pos, objects[i]), smoothing);
+        } else {
+            result = obj_union(result, from_desc(pos, objects[i]));
+        }
     }
 
     /*
@@ -197,18 +203,6 @@ vec3 get_light(vec3 pos, vec3 dir, vec3 color) {
     return ambient + diffuse;
 }
 
-vec3 get_material(vec3 pos, uint id) {
-    switch(id) {
-    case 1:
-        return vec3(0.0, 0.5, 0.25);
-    case 2:
-        return vec3(0.9, 0.25, 0.0);
-    case 3:
-        return vec3(0.2 + 0.4 * mod(floor(pos.x) + floor(pos.z), 2.0));
-    }
-    return vec3(0);
-}
-
 vec3 apply_fog(vec3 col, vec3 fog_col, float dist) {
     float start = 300.0;
     float amount = 1.0 - exp(-(dist - 8.0) * (1.0 / start));
@@ -227,8 +221,8 @@ void main() {
     if(res.obj.distance >= MAX_DIST) {
         col += background - max(0.4 * direction.y, 0.0);
     } else {
-        vec3 mat = get_material(res.pos, res.obj.id);
-        col += get_light(res.pos, direction, mat);
+        // vec3 mat = get_material(res.pos, res.obj.id);
+        col += get_light(res.pos, direction, res.obj.material);
         // fog
         col = apply_fog(col, background, res.total_dist * 3.0);
     }

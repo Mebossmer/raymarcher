@@ -9,9 +9,10 @@
 #define PLANE 3
 
 struct ObjectDesc {
+    const char *name;
     uint32_t type;
     glm::vec3 pos;
-    uint32_t material;
+    glm::vec3 material;
 
     union {
         float radius; // spheres
@@ -25,6 +26,10 @@ struct Scene {
     ObjectDesc objects[32];
     uint32_t nb_objects;
     uint32_t program;
+    bool enable_smoothing;
+    float smoothing;
 
+    void update_scene(void);
+    void update_object(uint32_t index);
     void add_object(ObjectDesc obj);
 };

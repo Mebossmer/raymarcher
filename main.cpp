@@ -170,34 +170,55 @@ int main(void) {
 
     Scene scene {};
     scene.program = create_program(read_txt_file("shaders/display.glsl").c_str(), read_txt_file("shaders/scene.glsl").c_str());
+    scene.smoothing = 10.0f;
 
     scene.add_object({
+        .name = "sphere_1",
         .type = SPHERE,
         .pos = glm::vec3(3.0f, 3.0f, 0.0f),
-        .material = 1,
+        .material = glm::vec3(0.0, 0.5, 0.25),
         .radius = 1.0f
     });
     scene.add_object({
+        .name = "sphere_2",
+        .type = SPHERE,
+        .pos = glm::vec3(10.0f, 2.0f, 3.0),
+        .material = glm::vec3(0.5f, 1.0f, 0.2f),
+        .radius = 1.2f
+    });
+    scene.add_object({
+        .name = "box",
         .type = BOX,
         .pos = glm::vec3(1.0f, 2.0f, 5.0f),
-        .material = 2,
+        .material = glm::vec3(0.9, 0.25, 0.0),
         .size = glm::vec3(1.0f, 2.0f, 1.0f)
     });
     scene.add_object({
+        .name = "ground_box",
+        .type = BOX,
+        .pos = glm::vec3(0.0f),
+        .material = glm::vec3(0.2f),
+        .size = glm::vec3(20.0f, 0.1f, 20.0f)
+    });
+    /*
+    scene.add_object({
+        .name = "ground_plane",
         .type = PLANE,
-        .material = 3,
+        .material = glm::vec3(0.2f, 0.2f, 0.2f),
         .normal = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f)
     });
+    */
     scene.add_object({
+        .name = "torus",
         .type = TORUS,
         .pos = glm::vec3(-3.0f, 5.0f, 9.0f),
-        .material = 2,
+        .material = glm::vec3(0.9, 0.25, 0.0),
         .torus = glm::vec2(0.5f, 0.25f)
     });
 
     glfwShowWindow(window);
 
-    glm::vec3 pos(0.0f);
+    glm::vec3 pos(0.0f, 2.0f, 0.0f);
     glm::vec3 dir(0.0f);
     glm::vec3 up(0.0f, 1.0f, 0.0f);
     const float speed = 2.0f;
@@ -274,9 +295,28 @@ int main(void) {
         glUseProgram(0);
         glBindVertexArray(0);
 
-        ImGui::Begin("Debug Menu");
+        ImGui::Begin("debug menu");
 
-        ImGui::DragFloat3("Position", glm::value_ptr(pos));
+        ImGui::DragFloat3("position", glm::value_ptr(pos));
+        ImGui::Checkbox("enable smoothing", &scene.enable_smoothing);
+        ImGui::DragFloat("smoothing", &scene.smoothing, 0.1f);
+
+        for(uint32_t i = 0; i < scene.nb_objects; i++) {
+            ObjectDesc &desc = scene.objects[i];
+
+            ImGui::PushID(i);
+            ImGui::Text(desc.name);
+            ImGui::DragFloat3("pos", glm::value_ptr(desc.pos), 0.1f);
+            ImGui::DragFloat("radius", &desc.radius, 0.1f);
+            ImGui::DragFloat3("size", glm::value_ptr(desc.size), 0.1f);
+            ImGui::DragFloat2("torus", glm::value_ptr(desc.torus), 0.1f);
+            ImGui::DragFloat4("normal", glm::value_ptr(desc.normal), 0.1f);
+            ImGui::PopID();
+
+            scene.update_object(i);
+        }
+
+        scene.update_scene();
 
         ImGui::End();
 
